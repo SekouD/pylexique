@@ -11,29 +11,39 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', ]
+requirements = ['joblib', 'colorama', 'tqdm', 'pyxlsb', "dataclasses>=0.6; python_version < '3.7'", 'Click>=7.1', 'pandas'] # integrate 'faster_than_csv'
 
 setup_requirements = ['pytest-runner', ]
 
-test_requirements = ['pytest', ]
+test_requirements = [
+    'pytest-runner',
+    'pytest',
+    'pytest-cov',
+    "dataclasses>=0.6; python_version < '3.7'",
+    'Click>=7.1',
+]
 
 setup(
-    author="SekouD",
-    author_email='sekoud.python@gmail.com',
+    author="SekouDiaoNlp",
+    author_email='diao.sekou.nlp@gmail.com',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 5 - Production/Stable','Topic :: Software Development :: Libraries :: Python Modules',
+        'Topic :: Education',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Utilities',
         'Intended Audience :: Developers',
+        'Intended Audience :: End Users/Desktop',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        "Programming Language :: Python :: 2",
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
     ],
-    description="Pylexique est une interface python pour Lexique382",
+    description="Pylexique is a Python wrapper around Lexique83",
     entry_points={
         'console_scripts': [
             'pylexique=pylexique.cli:main',
@@ -47,14 +57,14 @@ setup(
                   'tests': ['tests/*'],
                   'translations': ['pylexique/locale/*'],
                   'type_stubs': ['pylexique/py.typed', 'pylexique/*'],
-                  'pylexique382': ['pylexique/Lexique382/*']},
+                  'pylexique383': ['pylexique/Lexique383/*']},
     keywords='pylexique',
     name='pylexique',
     packages=find_packages(include=['pylexique']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/SekouD/pylexique',
-    version='0.1.0',
+    url='https://github.com/SekouDiaoNlp/pylexique',
+    version='1.3.5',
     zip_safe=False,
 )
