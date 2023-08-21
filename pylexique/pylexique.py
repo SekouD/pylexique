@@ -1,170 +1,396 @@
 # -*- coding: utf-8 -*-
 
-"""Main module."""
+"""Main module of pylexique."""
 
-from collections import OrderedDict
+from collections import OrderedDict, defaultdict
+from collections.abc import Sequence
 import pkg_resources
-import tables
+import json
+from math import isnan
+# import faster_than_csv as csv
+import csv
+from csv import reader
+import pandas as pd
+from dataclasses import dataclass
+from typing import DefaultDict, Dict, List, Optional, Tuple, Union, Generator, Any, Iterator
 
+__all__ = ['Lexique383', 'LexItem', 'LexEntryTypes']
+
+try:
+    from utils import logger
+except (ModuleNotFoundError, ImportError):
+    from .utils import logger
 
 _RESOURCE_PACKAGE = __name__
 
-LEXIQUE382_PATH = '/'.join(('Lexique382', 'lexique382.pickle'))
-PYLEXIQUE_DATABASE = '/'.join(('Lexique382', 'lexique382.h5'))
+HOME_PATH = '/'.join(('Lexique', ''))
+_RESOURCE_PATH_csv = pkg_resources.resource_filename(_RESOURCE_PACKAGE, 'Lexique383/Lexique383.txt')
+_VALUE_ERRORS_PATH = pkg_resources.resource_filename(_RESOURCE_PACKAGE, 'errors/value_errors.json')
+_LENGTH_ERRORS_PATH = pkg_resources.resource_filename(_RESOURCE_PACKAGE, 'errors/length_errors.json')
 
-LEXIQUE382_FIELD_NAMES = ['ortho', 'phon', 'lemme', 'cgram', 'genre', 'nombre', 'freqlemfilms2', 'freqlemlivres', 'freqfilms2',
-                          'freqlivres', 'infover', 'nbhomogr', 'nbhomoph', 'islem', 'nblettres', 'nbphons', 'cvcv', 'p_cvcv',
+LEXIQUE383_FIELD_NAMES = ['ortho', 'phon', 'lemme', 'cgram', 'genre', 'nombre', 'freqlemfilms2', 'freqlemlivres',
+                          'freqfilms2',
+                          'freqlivres', 'infover', 'nbhomogr', 'nbhomoph', 'islem', 'nblettres', 'nbphons', 'cvcv',
+                          'p_cvcv',
                           'voisorth', 'voisphon', 'puorth', 'puphon', 'syll', 'nbsyll', 'cv_cv', 'orthrenv', 'phonrenv',
                           'orthosyll', 'cgramortho', 'deflem', 'defobs', 'old20', 'pld20', 'morphoder', 'nbmorph']
 
+ConvertedRow = Tuple[str, str, str, str, str, str, float, float, float, float, str, int, int, bool,
+                     int, int, str, str, int, int, int, int, str, int, str, str, str, str, str, float,
+                     int, float, float, str, int]
 
-class LexEntry(tables.IsDescription):
+
+@dataclass(init=True, repr=False, eq=True, order=False, unsafe_hash=False, frozen=True)
+class LexEntryTypes:
     """
-    Schema for the Lexique382 database table.
+    Type information about all the lexical attributes in a LexItem object.
 
     """
-    ortho = tables.StringCol(64)
-    phon = tables.StringCol(64)
-    lemme = tables.StringCol(64)
-    cgram = tables.StringCol(32)
-    genre = tables.StringCol(8)
-    nombre = tables.StringCol(8)
-    freqlemfilms2 = tables.Float32Col()
-    freqlemlivres = tables.Float32Col()
-    freqfilms2 = tables.Float32Col()
-    freqlivres = tables.Float32Col()
-    infover = tables.StringCol(32)
-    nbhomogr = tables.Int8Col()
-    nbhomoph = tables.Int8Col()
-    islem = tables.BoolCol()
-    nblettres = tables.Int8Col()
-    nbphons = tables.Int8Col()
-    cvcv = tables.StringCol(64)
-    p_cvcv = tables.StringCol(64)
-    voisorth = tables.Int8Col()
-    voisphon = tables.Int8Col()
-    puorth = tables.Int8Col()
-    puphon = tables.Int8Col()
-    syll = tables.StringCol(64)
-    nbsyll = tables.Int8Col()
-    cv_cv = tables.StringCol(64)
-    orthrenv = tables.StringCol(64)
-    phonrenv = tables.StringCol(64)
-    orthosyll = tables.StringCol(64)
-    cgramortho = tables.StringCol(32)
-    deflem = tables.Float32Col()
-    defobs = tables.Int8Col()
-    old20 = tables.Float32Col()
-    pld20 = tables.Float32Col()
-    morphoder = tables.StringCol(64)
-    nbmorph = tables.Int8Col()
+    ortho: str
+    phon: str
+    lemme: str
+    cgram: str
+    genre: str
+    nombre: str
+    freqlemfilms2: float
+    freqlemlivres: float
+    freqfilms2: float
+    freqlivres: float
+    infover: str
+    nbhomogr: int
+    nbhomoph: int
+    islem: bool
+    nblettres: int
+    nbphons: int
+    cvcv: str
+    p_cvcv: str
+    voisorth: int
+    voisphon: int
+    puorth: int
+    puphon: int
+    syll: str
+    nbsyll: int
+    cv_cv: str
+    orthrenv: str
+    phonrenv: str
+    orthosyll: str
+    cgramortho: str
+    deflem: float
+    defobs: int
+    old20: float
+    pld20: float
+    morphoder: str
+    nbmorph: int
 
 
-class Lexique382(object):
+@dataclass(init=True, repr=False, eq=True, order=False, unsafe_hash=False, frozen=True)
+class LexItem(LexEntryTypes):
+    """
+    | This class defines the lexical items in Lexique383.
+    | It uses slots for memory efficiency.
+
+    """
+    _s = LEXIQUE383_FIELD_NAMES
+    __slots__ = _s
+
+    def __repr__(self) -> str:
+        return '{0}({1}, {2}, {3})'.format(self.__class__.__name__, self.ortho, self.lemme, self.cgram)
+
+    def to_dict(self) -> Dict[str, Union[str, float, int, bool]]:
+        """
+        | Converts the LexItem to a dict containing its attributes and their values
+
+        :return: OrderedDict.
+            Dictionary with key/values correspondence wit LexItem objects.
+        :raises: AttributeError.
+        """
+        attributes = []
+        for attr in self.__slots__:
+            try:
+                value = getattr(self, attr)
+            except AttributeError as e:
+                logger.warning(e)
+                continue
+            attributes.append((attr, value))
+        result = OrderedDict(attributes)
+        return result
+
+
+class Lexique383:
     """
     This is the class handling the lexique database.
+    It provides methods for interacting with the Lexique DB
+    and retrieve lexical items.
+    All the lexical items are then stored in an Ordered Dict.
 
     :param lexique_path: string.
-        Path to the lexuique csv file.
+        Path to the lexique file.
+    :param parser_type: string.
+        'pandas_csv' and 'csv' are valid values. 'csv' is the default value.
+    :cvar lexique: Dictionary containing all the LexicalItem objects indexed by orthography.
+    :cvar lemmes: Dictionary containing all the LexicalItem objects indexed by lemma.
+    :cvar anagrams: Dictionary containing all the LexicalItem objects indexed by anagram form.
     """
 
-    def __init__(self, lexique_path=None):
+    lexique: Dict[str, Any] = OrderedDict()
+    value_errors: List[Any] = []
+    length_errors: List[Any] = []
+    lemmes: Dict[str, List[LexItem]] = defaultdict(list)
+    anagrams: Dict[str, List[LexItem]] = defaultdict(list)
+
+    def __init__(self, lexique_path: Optional[str] = None, parser_type: str = 'csv') -> None:
         self.lexique_path = lexique_path
-        self.lexique = OrderedDict
+        if parser_type not in {'pandas_csv', 'csv'}:
+            raise ValueError(f"The value {parser_type} is not permitted. Only 'pandas_csv' and 'csv' are valid values.")
         if lexique_path:
-            self.lexique = self.parse_lexique(self.lexique_path)
+            if not isinstance(lexique_path, str):
+                raise TypeError(f"Argument 'lexique_path' must be of type String, not {type(lexique_path)}")
+            try:
+                self._parse_lexique(lexique_path, parser_type)
+            except UnicodeDecodeError as e:
+                raise UnicodeError(f"There was a unicode error while parsing {type(lexique_path)}.") from e
+            except FileNotFoundError as e:
+                raise ValueError(f"Argument 'lexique_path' must be a valid path to Lexique383") from e
         else:
-            file_name = pkg_resources.resource_filename(_RESOURCE_PACKAGE, PYLEXIQUE_DATABASE)
-            h5file = tables.open_file(file_name, mode="r", title="pylexique")
-            self.lexique = h5file.root.lexique382.data
-            # file_path = pkg_resources.resource_filename(_RESOURCE_PACKAGE, LEXIQUE382_PATH)
-            # with open(file_path, 'rb') as file:
-            #     self.lexique = pickle.load(file)
+            try:
+                # Tries to load the pre-shipped Lexique38X if no path file to the lexicon is provided.
+                self._parse_lexique(_RESOURCE_PATH_csv, parser_type)
+            except UnicodeDecodeError as e:
+                raise UnicodeError(f"There was a unicode error while parsing {type(_RESOURCE_PATH_csv)}.") from e
+            except FileNotFoundError as e:
+                raise ValueError(f"Argument 'lexique_path' must be a valid path to Lexique383") from e
         return
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return '{0}.{1}'.format(__name__, self.__class__.__name__)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.lexique)
 
-    def parse_lexique(self, lexique_path):
+    @staticmethod
+    def _parse_csv(lexique_path: str) -> Generator[list, Any, None]:    #type: ignore[type-arg]
         """
-        Parses the given lexique csv file and creates a hdf5 table to store the data.
 
         :param lexique_path: string.
-            Path to the lexuique csv file.
-        :return: PyTables.Table
+            Path to the lexique file.
+        :return: generator of rows:
+            Content of the Lexique38x database.
         """
-        with open(lexique_path, 'r', encoding='utf-8') as csv_file:
-            content = csv_file.readlines()
-            fields = [field.split('_')[-1] for field in content[0].strip().split('\t')]
-            if fields[17] == 'cvcv':
-                fields[17] = 'p_cvcv'
-            if fields[24] == 'cv-cv':
-                fields[17] = 'cv_cv'
-            lexique382_db = self.create_table(content[1:])
-        return lexique382_db
+        with open(lexique_path, 'r', encoding='utf-8', errors='ignore') as csv_file:
+            raw_content = csv_file.readlines()
+            content = (row.strip().split('\t') for row in raw_content[1:])
+            return content
 
-    def create_table(self, lexique):
+    def _parse_lexique(self, lexique_path: str, parser_type: str) -> None:
         """
-        Creates an hdf5 table populated with the entries in lexique.
+        | Parses the given lexique file and creates 2 hash tables to store the data.
 
-        :param lexique: Iterable.
-            Iterable containing the lexique382 entries.
-        :return: PyTables.Table
+        :param lexique_path: string.
+            Path to the lexique file.
+        :param parser_type: string.
+            Can be either 'csv', 'pandas_csv'.
+        :return:
         """
-        FILTERS = tables.Filters(complib='zlib', complevel=5)
-        file_name = pkg_resources.resource_filename(_RESOURCE_PACKAGE, PYLEXIQUE_DATABASE)
-        h5file = tables.open_file(file_name, mode="w", title="pylexique", filters=FILTERS)
-        group = h5file.create_group("/", 'lexique382', 'Lexique382')
-        table = h5file.create_table(group, 'data', LexEntry, "Lexique382 Database")
-        lex_item = table.row
-        for row in lexique:
-            row_fields = row.strip().split('\t')
-            for field, value in zip(LEXIQUE382_FIELD_NAMES, row_fields):
-                if field in ('freqlemfilms2', 'freqlemlivres', 'freqfilms2', 'freqlivres', 'deflem', 'old20', 'pld20'):
-                    if value == '':
-                        value = 'nan'
-                    lex_item[field] = float(value)
-                elif field in ('nbhomogr', 'nbhomoph', 'nblettres', 'nbphons', 'voisorth', 'voisphon',
-                               'puorth', 'puphon', 'nbsyll', 'defobs', 'nbmorph'):
-                    if value == '':
-                        value = '0'
-                    lex_item[field] = int(value)
-                elif field in ('ortho', 'phon', 'orthosyll', 'syll', 'orthrenv', 'phonrenv', 'lemme', 'morphoder'):
-                    lex_item[field] = value.encode('utf-8')
-                else:
-                    lex_item[field] = value
-            lex_item.append()
-        table.flush()
-        return table
-
-
-class LexItem(object):
-    """
-    This class defines the lexical items in Lexique382.
-
-    :param row_fields:
-    """
-    __slots__ = LEXIQUE382_FIELD_NAMES
-
-    def __init__(self, row_fields):
-        for attr, value in zip(LEXIQUE382_FIELD_NAMES, row_fields):
-            setattr(self, attr, value)
+        try:
+            if parser_type == 'pandas_csv':
+                df = pd.read_csv(lexique_path, delimiter='\t')
+                content = (list(row) for row in df.values)
+            elif parser_type == 'csv':
+                content = self._parse_csv(lexique_path)
+            else:
+                content = self._parse_csv(lexique_path)
+        except UnicodeDecodeError:
+            logger.warn(f"there was an issue while parsing the file {lexique_path}."
+                        f" Trying again with built-in csv parser")
+            content = self._parse_csv(lexique_path)
+        self._create_db(content)
+        if self.value_errors:
+            self._save_errors(self.value_errors, _VALUE_ERRORS_PATH)
+        if self.length_errors:
+            self._save_errors(self.length_errors, _LENGTH_ERRORS_PATH)
         return
 
-    def __repr__(self):
-        return '{0}.{1}({2}, {3}, {4})'.format(__name__, self.__class__.__name__, self.ortho, self.lemme, self.cgram)
+    def _create_db(self, lexicon: Generator[list, Any, None]) -> None:  #type: ignore[type-arg]
+        """
+        | Creates 2 hash tables populated with the entries in lexique if it does not exist yet.
+        | One hash table holds the LexItems, the other holds the same data but grouped by lemmma to give access to all lexical forms of a word.
 
+        :param lexicon: Iterable.
+            Iterable containing the lexique383 entries.
+        :return:
+        """
+        for row in lexicon:
+            try:
+                converted_row_fields = self._convert_entries(row)
+            except ValueError:
+                continue
+            lexical_entry = LexItem(*converted_row_fields)
+            self.lemmes[lexical_entry.lemme].append(lexical_entry)
+            sorted_form = ''.join(sorted(lexical_entry.ortho))
+            self.anagrams[sorted_form].append(lexical_entry)
+            if converted_row_fields[0] in self.lexique and not isinstance(self.lexique[converted_row_fields[0]], list):
+                self.lexique[converted_row_fields[0]] = [self.lexique[converted_row_fields[0]]]
+                self.lexique[converted_row_fields[0]].append(lexical_entry)
+            elif converted_row_fields[0] in self.lexique and isinstance(self.lexique[converted_row_fields[0]], list):
+                self.lexique[converted_row_fields[0]].append(lexical_entry)
+            else:
+                self.lexique[converted_row_fields[0]] = lexical_entry
+        return
 
+    def _convert_entries(self, row_fields: Union[List[str], List[Union[str, float, int, bool]]]) -> ConvertedRow:
+        """
+        | Convert entries from `strings` to `int`, `bool` or `float` and generates
+        | a new list with typed entries.
 
+        :param row_fields:
+            List of column entries representing a row.
+        :return: ConvertedRow:
+            List of typed column entries representing a typed row.
+        """
+        errors = defaultdict(list)
+        converted_row_fields = []
+        for attr, value in zip(LEXIQUE383_FIELD_NAMES, row_fields):
+            if isinstance(value, float) and isnan(value):
+                value = ''
+            if attr in {'freqlemfilms2', 'freqlemlivres', 'freqfilms2', 'freqlivres', 'old20', 'pld20'}:
+                if not isinstance(value, float):
+                    if (value != '' or value != ' ') and ',' in value:
+                        value = value.replace(',', '.')
+                        value = float(value)
+            if attr == 'islem':
+                if isinstance(value, str):
+                    value = value.strip()
+                if value != '' and value not in ('0', '1', 0, 1):
+                    value = 0
+                try:
+                    value = bool(int(value))
+                except ValueError:
+                    errors[row_fields[0]].append({attr: value})
+                    value = value
+                    self.value_errors.append(errors)
+            if attr in {'nbhomogr', 'nbhomoph', 'nblettres', 'nbphons',
+                        'voisorth', 'voisphon', 'puorth', 'puphon', 'nbsyll'}:
+                if value != '' or value != ' ':
+                    try:
+                        value = int(value)
+                    except ValueError:
+                        errors[row_fields[0]].append({attr: value})
+                        value = value
+                        self.value_errors.append(errors)
+            converted_row_fields.append(value)
+        if len(converted_row_fields) != 35:
+            self.length_errors.append((converted_row_fields, row_fields))
+            raise ValueError
+        return converted_row_fields  # type: ignore[return-value]
+
+    def get_lex(self, words: Union[Tuple[str, ...], str]) -> Dict[str, Union[LexItem, List[LexItem]]]:
+        """
+        Recovers the lexical entries for the words in the sequence
+
+        :param words:
+            A string or a tuple of multiple strings for getting the LexItems for multiple words.
+        :return:
+            Dictionary of LexItems.
+        :raises: TypeError.
+        """
+        results = OrderedDict()
+        if isinstance(words, str):
+            try:
+                results[words] = self.lexique[words.lower()]
+            except AttributeError:
+                logger.warning('the word {} is not in Lexique383'.format(words))
+        elif isinstance(words, Sequence):
+            for word in words:
+                if isinstance(word, str):
+                    try:
+                        results[word] = self.lexique[word.lower()]
+                    except AttributeError:
+                        logger.warning('The word {} is not in Lexique383\n'.format(word))
+                        continue
+                else:
+                    logger.warning('{} is not a valid string'.format(word))
+                    raise TypeError
+        else:
+            raise TypeError
+        return results
+
+    def get_all_forms(self, word: str) -> List[LexItem]:
+        """
+        Gets all lexical forms of a given word.
+
+        :param word:
+            String.
+        :return:
+            List of LexItem objects sharing the same root lemma.
+        :raises: ValueError.
+        :raises: TypeError.
+        """
+        try:
+            lex_entry = self.lexique[word.lower()]
+        except ValueError as e:
+            logger.warning('The word {} is not in Lexique383\n'.format(word))
+            raise ValueError from e
+        if isinstance(lex_entry, LexItem):
+            lemmes = self.lemmes[lex_entry.lemme]
+        elif isinstance(lex_entry, OrderedDict):
+            lemmes = self.lemmes[lex_entry['lemme']]
+        elif isinstance(lex_entry, list):
+            distinct = {elmt.lemme for elmt in lex_entry}
+            lemmes = []
+            for lemme in distinct:
+                lemmes.extend(self.lemmes[lemme])
+        else:
+            raise TypeError
+        return lemmes
+
+    def get_anagrams(self, word: str) -> List[LexItem]:
+        """
+        Gets all lexical forms of a given word.
+
+        :param word:
+            String.
+        :return:
+            List of LexItem objects which are anagrams of the given word.
+        :raises: ValueError.
+        :raises: TypeError.
+        """
+        try:
+            lex_entry = self.lexique[word.lower()]
+        except ValueError as e:
+            logger.warning('The word {} is not in Lexique383\n'.format(word))
+            raise ValueError from e
+        if isinstance(lex_entry, LexItem):
+            sorted_form = ''.join(sorted(lex_entry.ortho))
+            anagrams = self.anagrams[sorted_form]
+        elif isinstance(lex_entry, OrderedDict):
+            sorted_form = ''.join(sorted(lex_entry['ortho']))
+            anagrams = self.anagrams[sorted_form]
+        elif isinstance(lex_entry, list):
+            sorted_form = ''.join(sorted(lex_entry[0].ortho))
+            anagrams = self.anagrams[sorted_form]
+        else:
+            raise TypeError
+        final_anagrams = [lex_item for lex_item in anagrams if lex_item.ortho != word.lower()]
+        return final_anagrams
+
+    @staticmethod
+    def _save_errors(errors: Union[
+        List[Tuple[List[Union[str, float, int, bool]], List[str]]], List[DefaultDict[str, List[Dict[str, str]]]]],
+                     errors_path: str) -> None:
+        """
+        Saves the mismatched key/values in Lexique383 based on type coercion.
+
+        :param errors:
+            List of errors encountered while parsing Lexique38x
+        :param errors_path:
+            Path to save the errors.
+        :return:
+
+        """
+        with open(errors_path, 'w', encoding='utf-8') as json_file:
+            json.dump(errors, json_file, indent=4)
+        return
 
 
 if __name__ == "__main__":
-    test = Lexique382('C:/Users/Utilisateur/PycharmProjects/pylexique/pylexique/Lexique382/Lexique382.txt')
-    # test1 = Lexique382()
-    auxes = [x[:] for x in test.lexique.iterrows() if x['cgram'].decode('utf-8') == 'AUX']
-    verbs = [x[:] for x in test.lexique.iterrows() if x['cgram'].decode('utf-8') == 'VER']
-    print('ok')
     pass

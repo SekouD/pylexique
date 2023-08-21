@@ -15,7 +15,7 @@ Types of Contributions
 Report Bugs
 ~~~~~~~~~~~
 
-Report bugs at https://github.com/SekouD/pylexique/issues.
+Report bugs at https://github.com/SekouDiaoNlp/pylexique/issues.
 
 If you are reporting a bug, please include:
 
@@ -45,7 +45,7 @@ articles, and such.
 Submit Feedback
 ~~~~~~~~~~~~~~~
 
-The best way to send feedback is to file an issue at https://github.com/SekouD/pylexique/issues.
+The best way to send feedback is to file an issue at https://github.com/SekouDiaoNlp/pylexique/issues.
 
 If you are proposing a feature:
 
@@ -102,8 +102,8 @@ Before you submit a pull request, check that it meets these guidelines:
 2. If the pull request adds functionality, the docs should be updated. Put
    your new functionality into a function with a docstring, and add the
    feature to the list in README.rst.
-3. The pull request should work for Python 2.7, 3.4, 3.5 and 3.6, and for PyPy. Check
-   https://travis-ci.org/SekouD/pylexique/pull_requests
+3. The pull request should work for Python 3.6, 3.7, 3.8 3.9 and for PyPy. Check
+   https://github.com/SekouDiaoNlp/pylexique/actions
    and make sure that the tests pass for all supported Python versions.
 
 Tips
@@ -125,4 +125,4 @@ $ bumpversion patch # possible: major / minor / patch
 $ git push
 $ git push --tags
 
-Travis will then deploy to PyPI if tests pass.
+GitHub Actions will then deploy to PyPI if tests pass.

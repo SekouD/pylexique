@@ -11,29 +11,51 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['Click>=6.0', ]
+try:
+    with open('requirements.txt') as f:
+        requirements = f.read().splitlines()
+except FileNotFoundError:
+    requirements = ['joblib', 'colorama', 'tqdm', 'pyxlsb', "dataclasses>=0.6; python_version < '3.7'",
+                    'Click>=8.0.3', 'pandas']
 
 setup_requirements = ['pytest-runner', ]
 
-test_requirements = ['pytest', ]
+try:
+    with open('requirements_dev.txt') as f:
+        test_requirements = f.read().splitlines()
+except FileNotFoundError:
+    test_requirements = [
+        'pytest-runner',
+        'pytest',
+        'pytest-cov',
+        "dataclasses>=0.6; python_version < '3.7'",
+        'Click>=8.0.3',
+    ]
 
 setup(
-    author="SekouD",
-    author_email='sekoud.python@gmail.com',
+    author="SekouDiaoNlp",
+    author_email='diao.sekou.nlp@gmail.com',
     classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 5 - Production/Stable',
+        'Topic :: Software Development :: Libraries :: Python Modules',
+        'Topic :: Education',
+        'Topic :: Scientific/Engineering :: Artificial Intelligence',
+        'Topic :: Utilities',
         'Intended Audience :: Developers',
+        'Intended Audience :: End Users/Desktop',
+        'Intended Audience :: Education',
+        'Intended Audience :: Science/Research',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        "Programming Language :: Python :: 2",
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Natural Language :: French',
+        'Operating System :: OS Independent',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
-    description="Pylexique est une interface python pour Lexique382",
+    description="Pylexique is a Python wrapper around Lexique383",
     entry_points={
         'console_scripts': [
             'pylexique=pylexique.cli:main',
@@ -47,14 +69,14 @@ setup(
                   'tests': ['tests/*'],
                   'translations': ['pylexique/locale/*'],
                   'type_stubs': ['pylexique/py.typed', 'pylexique/*'],
-                  'pylexique382': ['pylexique/Lexique382/*']},
+                  'pylexique383': ['pylexique/Lexique383/*']},
     keywords='pylexique',
     name='pylexique',
     packages=find_packages(include=['pylexique']),
     setup_requires=setup_requirements,
     test_suite='tests',
     tests_require=test_requirements,
-    url='https://github.com/SekouD/pylexique',
-    version='0.1.0',
+    url='https://github.com/SekouDiaoNlp/pylexique',
+    version='1.5.0',
     zip_safe=False,
 )

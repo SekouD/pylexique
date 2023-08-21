@@ -1,0 +1,63 @@
+name: Build source and wheels packages and upload them to PyPI
+
+# Build on every branch push, tag push, and pull request change:
+on: [workflow_dispatch]
+# Alternatively, to publish when a (published) GitHub Release is created, use the following:
+# on:
+#   push:
+#   pull_request:
+#   release:
+#     types:
+#       - published
+
+jobs:
+    build_wheels_with_poetry_and_upload_to_pypi:
+        name: Build and upload poetry packages on ${{ matrix.os }}
+        runs-on: ${{ matrix.os }}
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ ubuntu-latest ]
+                include:
+                    -   os: ubuntu-latest
+                        path: ~/.cache/pip
+                python-version: [ 3.9 ]
+
+        steps:
+            -   uses: actions/checkout@v2
+
+            -   uses: actions/setup-python@v2
+                with:
+                    python-version: ${{ matrix.python-version }}
+
+            -   name: Install Poetry
+                uses: snok/install-poetry@v1
+                with:
+                    virtualenvs-create: true
+                    virtualenvs-in-project: true
+            -   name: Load cached venv
+                id: cached-pip-wheels
+                uses: actions/cache@v2
+                with:
+                    path: ~/.cache
+                    key: venv-${{ runner.os }}-${{ matrix.python-version }}-${{ hashFiles('**/poetry.lock') }}
+            -   name: Install dependencies
+                run: poetry install --no-interaction --no-root
+            -   name: Install Package
+                run: poetry install --no-interaction
+            -   name: Build Package
+                run: poetry build
+            -   name: Run Bandit
+                run: poetry run bandit -r mlconjug3/ -c .bandit.yml
+            -   name: Run Type Checker
+                run: |
+                    poetry run pip install types-setuptools
+                    poetry run mypy
+            -   name: Run Pytest with coverage
+                run: poetry run pytest --cov=./mlconjug3/
+            -   name: Upload coverage artifacts to codecov
+                run: poetry run codecov --token=370386ee-28d7-441f-b4eb-7f63f8c5c3e9
+            -   name: Upload Package to PyPi
+                run: |
+                    poetry config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
+                    poetry publish
